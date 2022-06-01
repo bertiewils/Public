@@ -1,0 +1,8 @@
+---
+- name: Provision cloud-vpn
+  hosts: VPN
+  become: yes
+  become_user: root
+  roles:
+    - common
+    - vpn

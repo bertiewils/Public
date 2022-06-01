@@ -1,0 +1,136 @@
+---
+- name: Allow media wiki access from internal networks
+  ufw:
+    rule: allow
+    port: '<REDACTED>'
+    proto: tcp
+    src: '<REDACTED>/24'
+
+- name: Install dependencies
+  apt:
+    pkg:
+      - tasksel
+      - python3-pymysql
+    state: latest
+    update_cache: true
+
+- name: Tasksel install LAMP server
+  command: tasksel install lamp-server
+  become: true
+  become_user: root
+
+- name: Ensure mysql is running and starts on boot
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Install media wiki
+  apt:
+    pkg:
+      - mediawiki
+    state: latest
+    update_cache: true
+
+- name: Copy Media wiki files to correct directory
+  command: cp -R /var/lib/mediawiki/ /var/www/html/
+  become: true
+  become_user: root
+
+- name: Copy apache2 config
+  ansible.builtin.copy:
+    src: /Automation-files/sql/mediawiki.conf
+    dest: /etc/apache2/sites-available/mediawiki.conf
+    owner: root
+    group: root
+    mode: '0777'
+
+- name: Copy cloud wiki backup
+  ansible.builtin.copy:
+    src: /Automation-files/sql/cloudwiki-backup.sql
+    dest: /tmp/cloudwiki-backup.sql
+    owner: root
+    group: root
+    mode: '0777'
+
+- name: Create database user with name 'tekore' with all database privileges
+  community.mysql.mysql_user:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "<REDACTED>"
+    login_password: "<REDACTED>"
+    name: "<REDACTED>"
+    password: "<REDACTED>"
+    priv: '*.*:ALL'
+    state: present
+    check_implicit_admin: yes
+
+- name: Create a new 'cloudwiki' database
+  community.mysql.mysql_db:
+    name: cloudwiki
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "<REDACTED>"
+    login_password: "<REDACTED>"
+    state: present
+    check_implicit_admin: yes
+
+- name: Run mediawiki localsettings.php setup
+  command: php /usr/share/mediawiki/maintenance/install.php --confpath=/etc/mediawiki/ --dbname=cloudwiki --dbserver="localhost" --installdbuser=<REDACTED> --installdbpass=<REDACTED> --dbuser=<REDACTED> --dbpass=<REDACTED> --server="http://<REDACTED>" --scriptpath=/mediawiki --lang=en-gb --pass=<REDACTED> "cloudwiki" "<REDACTED>"
+  become: true
+  become_user: root
+  args:
+    creates: /etc/mediawiki/LocalSettings.php
+
+- name: Restore database ignoring errors
+  community.mysql.mysql_db:
+    name: cloudwiki
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    login_user: "<REDACTED>"
+    login_password: "<REDACTED>"
+    state: import
+    target: /tmp/cloudwiki-backup.sql
+    force: yes
+
+- name: Enable mediawiki
+  command: a2ensite mediawiki.conf
+  become: true
+  become_user: root
+
+- name: Reload apache2
+  command: systemctl reload apache2.service
+  become: true
+  become_user: root
+
+- name: Create the wikibackup directory
+  file:
+    path: /wikibackup
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy wiki backup script and set permissions
+  ansible.builtin.copy:
+    src: /Automation-files/sql/wiki-backup.sh
+    dest: /wikibackup/wiki-backup.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Enable wiki backup cronjob
+  ansible.builtin.cron:
+    name: WikiBackup
+    minute: "*/5"
+    hour: "*"
+    day: "*"
+    month: "*"
+    day: "*"
+    job: "bash /wikibackup/wiki-backup.sh"
+
+- name: Copy ssh keys for wiki backup
+  ansible.builtin.copy:
+    src: /Automation-files/sql/.ssh
+    dest: /root/
+    owner: root
+    group: root
+    mode: '0700'

@@ -1,0 +1,77 @@
+---
+- name: Install Fail2Ban    
+  apt:
+    name: fail2ban
+    state: present
+    update_cache: yes
+
+- name: Copy fail2ban config and set permissions
+  ansible.builtin.copy:
+    src: /Automation-files/vpn/fail2ban/defaults-debian.conf
+    dest: /etc/fail2ban/jail.d/defaults-debian.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start Fail2Ban
+  ansible.builtin.systemd:
+    name: fail2ban.service
+    state: started
+    enabled: yes
+
+- name: Copy sysctl.conf and set permissions
+  ansible.builtin.copy:
+    src: /Automation-files/vpn/sysctl.conf
+    dest: /etc/sysctl.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable ipv4 forwarding
+  command: sysctl -p
+  become: true
+  become_user: root
+  
+- name: Create the duckdns directory
+  file:
+    path: /duckdns
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy duckdns script and set permissions
+  ansible.builtin.copy:
+    src: /Automation-files/vpn/duckdns/duck.sh
+    dest: /duckdns/duck.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: First run of duckdns script
+  command: bash /duckdns/duck.sh
+  become: true
+  become_user: root
+
+- name: Enable duckdns cronjob
+  ansible.builtin.cron:
+    name: duckDNS
+    minute: "*"
+    hour: "*"
+    day: "*"
+    month: "*"
+    job: "bash /duckdns/duck.sh"
+
+- name: Allow all access from wireguard
+  ufw:
+    rule: allow
+    port: <REDACTED>
+    proto: udp
+    src: '<REDACTED>'
+
+- name: Allow route through the firewall to vpn tunnel
+  ufw:
+    rule: allow
+    route: yes
+    src: <REDACTED>/24
+    dest: <REDACTED>/24

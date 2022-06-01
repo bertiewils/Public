@@ -1,0 +1,8 @@
+---
+- name: Provision cloud-store
+  hosts: _cloud_store
+  become: yes
+  become_user: root
+  roles:
+    - common
+    - store

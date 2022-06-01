@@ -1,0 +1,4 @@
+#! /bin/bash
+adduser <USERNAME>
+echo '<USERNAME>:<PASSWORD>' | chpasswd
+usermod -aG google-sudoers <USERNAME>

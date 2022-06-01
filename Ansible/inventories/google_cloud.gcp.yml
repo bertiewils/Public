@@ -1,0 +1,10 @@
+---
+  plugin: gcp_compute
+  projects:
+    - gcloud-<REDACTED>
+  auth_kind: serviceaccount
+  service_account_file: <REDACTED>
+  keyed_groups:
+    - key: name
+  groups:
+    VPN: "'cloud-vpn' in name"
