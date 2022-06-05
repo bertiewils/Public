@@ -1,11 +1,8 @@
 ---
-- name: Enable UFW
-  ufw:
-    state: enabled
-
-- name: Enable UFW logging
-  ufw:
-    logging: 'True'
+- name: Ensure UFW is installed
+  package:
+    name: ufw
+    state: present
 
 - name: Allow SSH access from internal networks
   ufw:
@@ -16,3 +13,11 @@
   with_items:
     - <REDACTED>/24
     - <REDACTED>/24
+
+- name: Enable UFW logging
+  ufw:
+    logging: 'True'
+
+- name: Enable UFW
+  ufw:
+    state: enabled
